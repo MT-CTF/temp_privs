@@ -26,6 +26,7 @@ local unit_to_secs = {
     s = 1, m = 60, h = 3600,
     D = 86400, W = 604800, M = 2592000, Y = 31104000,
 }
+local TIME_LIMIT = 86400 * 3 -- 3 days
 
 local function parse_time(t) --> secs
     if not t then return false end
@@ -111,20 +112,26 @@ local function handle_privs_command(caller, name, privstring, grantorrevoke, tim
         end
     end
 
-    if timestr then
-        local time_from_now = parse_time(timestr)
-        local time = os.time() + time_from_now
-        db[name] = {}
-        table.insert(db[name], {
-            time = time,
-            privs = minetest.privs_to_string(privs),
-            revoke_or_grant = grantorrevoke,
-        })
-        save_data(db_filename, db)
-        timestr = " for: "..timestr
-    else
-        timestr = " for: indefinitely"
+    if not timestr then
+        timestr = "3D"
     end
+
+    local time_from_now = parse_time(timestr)
+
+    if not caller_privs.ban then
+        time_from_now = math.min(time_from_now, TIME_LIMIT) -- Returns arg with lowest value
+    end
+
+    local time = os.time() + time_from_now
+    db[name] = {}
+    table.insert(db[name], {
+        time = time,
+        privs = minetest.privs_to_string(privs),
+        revoke_or_grant = grantorrevoke,
+    })
+    save_data(db_filename, db)
+    timestr = " for: "..timestr
+
     if grantorrevoke == "grant" then
         minetest.log("action", caller..' granted ('..minetest.privs_to_string(privs, ', ')..') privileges to '..name..timestr)
         if name ~= caller then
